@@ -1,0 +1,178 @@
+---
+title: "Exercício Computacional I"
+author: "Taiguara Melo Tupinambás"
+date: "21 de agosto de 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introdução
+
+A função $sinc(x)$, no intervalo $(0,\pi)$ possui a seguinte característica:
+
+```{r a}
+
+sinc <- function(x) {
+        y<-sin(pi*x)/(pi*x)
+}
+
+x<-seq(0.0001,pi,0.0001)
+y<-sinc(x)
+
+plot(x,y,type="l")
+
+```
+
+# Aproximação
+
+## Descrição das regras
+
+O conjunto de regras nebulosas será definido para as seguintes regiões:
+
+- $A_1$: x próximo de 0;
+- $A_2$: x próximo do ponto médio da primeira descida (entre o ponto máximo e o ponto mínimo);
+- $A_3$: x próximo do ponto mínimo da primeira curva;
+- $A_4$: x próximo do ponto médio entre o primeiro mínimo e o segundo máximo;
+- $A_5$: x próximo do segundo máximo local;
+- $A_6$: x próximo do ponto médio entre o segundo máximo local e o final do domínio;
+
+A definição dos pontos e seus locais no gráfico são apresentados a seguir:
+
+
+```{r regioes1}
+
+Ax<-NULL
+
+Ax[1]<-x[1]
+Ax[2]<-x[which.min(abs(y - (1+min(y))/2))]
+Ax[3]<-x[y==min(y)]
+Ax[4]<-x[which.min(abs(y - (max(y[(length(y)/2):length(y)])+min(y))/2))]
+Ax[5]<-x[y==max(y[(length(y)/2):length(y)])]
+Ax[6]<-x[(which(y==max(y[(length(y)/2):length(y)]))+length(x))/2]
+
+plot(x,y,type="l")
+
+for (i in 1:6) {
+        points(Ax[i],sinc(Ax[i]),col="red",bg="red",pch=21)
+}
+
+```
+
+A linearização por partes da aproximação é calculada para cada região e apresentada a seguir
+
+```{r regioes2}
+
+findline<-function(x) {
+        x1<-x
+        x2<-x+0.0001
+        y1<-sinc(x1)
+        y2<-sinc(x2)
+        a<-(y2-y1)/(x2-x1)
+        b<-y1-a*x1
+        xpoints<-seq(x-0.25,x+0.25,0.0001)
+        ypoints<-a*xpoints+b
+        line<-matrix(c(xpoints,ypoints),nrow=2,ncol=length(xpoints),byrow=T)
+        return(line)
+}
+
+approx_line<-findline(Ax[1])
+
+for (i in 2:6) {
+        approx_line<-rbind(approx_line,findline(Ax[i]))
+}
+
+plot(x,y,type="l")
+
+for (i in 1:6) {
+        points(Ax[i],sinc(Ax[i]),col="red",bg="red",pch=21)
+        lines(approx_line[2*i-1,],approx_line[2*i,],col="blue")
+}
+
+```
+
+Finalmente, são definidas as funções de pertinência do tipo gaussiana para cada região, em que a média é igual à coordenada x de cada ponto de sua respectiva região e o desvio padrão foi definido arbitrariamente.
+
+```{r pert}
+
+mu<-function(x,c) {
+        sd<-0.5
+        mu<-exp(-1/2*((x-c)/sd)^2)
+        return(mu)
+}
+
+z<-seq(-4,4,0.0001)
+mu_x<-mu(z,Ax[1])
+
+for (i in 2:6) {
+        mu_x<-rbind(mu_x,mu(z,Ax[i]))
+}
+
+plot(z,mu_x[1,],type="l",xlim=c(0,3))
+
+for (i in 2:6) {
+        lines(z,mu_x[i,])
+}
+
+```
+
+## Resultado
+
+Finalmente, baseado nas regras expostas acima, a aproximação é realizada:
+
+```{r res}
+
+findline<-function(x) {
+        x1<-x
+        x2<-x+0.0001
+        y1<-sinc(x1)
+        y2<-sinc(x2)
+        a<-(y2-y1)/(x2-x1)
+        b<-y1-a*x1
+        return(c(a,b))
+}
+
+findy<-function(l,x) {
+        y<-l[1]*x+l[2]
+        return(y)
+}
+
+func_line<-findline(Ax[1])
+
+for (i in 2:6) {
+        func_line<-rbind(func_line,findline(Ax[i]))
+}
+
+y_approx<-NULL
+
+for (k in 1:length(x)) {
+        y_approx[k]<-0
+        den<-0
+        for (i in 1:6) {
+                y_approx[k]<-y_approx[k]+mu(x[k],Ax[i])*findy(func_line[i,],x[k])
+                den<-den+mu(x[k],Ax[i])
+        }
+        y_approx[k]<-y_approx[k]/den
+}
+
+plot(x,y,type="l",ylim=c(-0.25,1.05))
+lines(x,y_approx,lty=2,col="red")
+legend(2.5,1,c("sinc(x)","Aproximação"),cex=0.8,col=c("black","red"),lty=1:2)
+
+```
+
+O erro quadrático médio da aproximação é apresentado a seguir:
+
+```{r eqm}
+
+eqm<-0
+
+for (i in 1:length(y)) {
+        eqm<-eqm+(y[i]-y_approx[i])^2
+}
+
+cat("Erro quadrático médio é:", eqm)
+
+```
